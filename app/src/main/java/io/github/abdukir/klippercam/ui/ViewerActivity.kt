@@ -18,6 +18,11 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.runtime.rememberCoroutineScope
+import io.github.abdukir.klippercam.data.StreamType
+import kotlinx.coroutines.launch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -51,17 +56,28 @@ class ViewerActivity : ComponentActivity() {
                 val density = LocalDensity.current
                 val screenMax = with(density) { max(config.screenWidthDp, config.screenHeightDp).dp.roundToPx() }
                 Box(Modifier.fillMaxSize().background(Color.Black)) {
-                    HorizontalPager(pager, Modifier.fillMaxSize(), beyondViewportPageCount = 0) { page ->
-                        LiveStreamView(
-                            streams[page.coerceIn(0, streams.lastIndex)],
-                            Modifier.fillMaxSize(),
-                            maxDim = screenMax.coerceAtMost(1920),
-                            fps = state.settings.viewerFps,
-                            zoomable = true,
-                            showStatus = false,
-                        )
-                    }
                     val current = streams[pager.currentPage.coerceIn(0, streams.lastIndex)]
+                    val scope = rememberCoroutineScope()
+                    // Touches on the printer screen are forwarded, so swiping between pages is
+                    // done with the arrow buttons there.
+                    HorizontalPager(
+                        pager, Modifier.fillMaxSize(), beyondViewportPageCount = 0,
+                        userScrollEnabled = current.type != StreamType.SCREEN,
+                    ) { page ->
+                        val s = streams[page.coerceIn(0, streams.lastIndex)]
+                        if (s.type == StreamType.SCREEN) {
+                            RemoteScreenView(s, Modifier.fillMaxSize().safeDrawingPadding().padding(top = 56.dp))
+                        } else {
+                            LiveStreamView(
+                                s,
+                                Modifier.fillMaxSize(),
+                                maxDim = screenMax.coerceAtMost(1920),
+                                fps = state.settings.viewerFps,
+                                zoomable = true,
+                                showStatus = false,
+                            )
+                        }
+                    }
                     val status by App.instance.hub.status(current.id).collectAsState()
                     Column(
                         Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.4f)).safeDrawingPadding().padding(4.dp),
@@ -79,6 +95,16 @@ class ViewerActivity : ComponentActivity() {
                                 )
                             }
                             StatusChip(status, Modifier.padding(end = 8.dp))
+                            if (streams.size > 1) {
+                                IconButton(
+                                    enabled = pager.currentPage > 0,
+                                    onClick = { scope.launch { pager.animateScrollToPage(pager.currentPage - 1) } },
+                                ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Previous camera", tint = Color.White) }
+                                IconButton(
+                                    enabled = pager.currentPage < streams.lastIndex,
+                                    onClick = { scope.launch { pager.animateScrollToPage(pager.currentPage + 1) } },
+                                ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Next camera", tint = Color.White) }
+                            }
                         }
                     }
                 }

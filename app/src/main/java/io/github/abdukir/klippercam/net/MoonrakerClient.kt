@@ -47,7 +47,11 @@ object MoonrakerClient {
         val info = async { serverInfo(printer) }
         val cams = async { webcams(printer) }
         val rtsp = async { probePaxx12Rtsp(printer) }
-        DiscoveryResult(info.await(), cams.await(), rtsp.await())
+        val screen = async { probePaxx12Screen(printer) }
+        val cameras = cams.await()
+        // The remote screen is often enabled without its Moonraker [webcam gui] entry.
+        val extras = rtsp.await() + listOfNotNull(screen.await().takeIf { cameras.none { it.type == StreamType.SCREEN } })
+        DiscoveryResult(info.await(), cameras, extras)
     }
 
     suspend fun serverInfo(printer: Printer): PrinterInfo {
@@ -76,8 +80,12 @@ object MoonrakerClient {
                 type = StreamType.H264_STREAM
                 streamUrl = streamUrl.trimEnd('/').removeSuffix("player") + "stream.h264"
             }
+            // paxx12 remote screen ([webcam gui], iframe at /screen/): view + touch control.
+            if (type == StreamType.IFRAME && streamUrl != null && streamUrl.trimEnd('/').endsWith("/screen")) {
+                type = StreamType.SCREEN
+            }
             // Without a stream URL the only thing we can show is the snapshot.
-            if (streamUrl.isNullOrBlank() && snapshotUrl != null) type = StreamType.MJPEG_ADAPTIVE
+            if (streamUrl.isNullOrBlank() && snapshotUrl != null && type != StreamType.SCREEN) type = StreamType.MJPEG_ADAPTIVE
             CameraStream(
                 printerId = printer.id,
                 name = o.str("name") ?: "Camera",
@@ -116,6 +124,26 @@ object MoonrakerClient {
         }
     }
 
+    /** Checks for the paxx12 remote screen (`/screen/snapshot`, enabled in firmware-config → Web). */
+    suspend fun probePaxx12Screen(printer: Printer): CameraStream? = withContext(Dispatchers.IO) {
+        val base = Urls.printerBase(printer.address) ?: return@withContext null
+        val req = Request.Builder().url(base.resolve("screen/snapshot")!!)
+            .apply { authHeaders(printer).forEach { (k, v) -> header(k, v) } }.build()
+        val code = runCatching { Http.client.newCall(req).execute().use { it.code } }.getOrNull()
+        // 200/304: running. 401: running but needs credentials. 404/502: not enabled.
+        if (code != 200 && code != 304 && code != 401) return@withContext null
+        CameraStream(
+            printerId = printer.id,
+            name = "Touchscreen",
+            type = StreamType.SCREEN,
+            streamUrl = "/screen/",
+            snapshotUrl = "/screen/snapshot",
+            aspectRatio = "480:320",
+            moonrakerUid = "paxx12-screen",
+            snapshotFallback = false,
+        )
+    }
+
     private suspend fun get(printer: Printer, path: String): JsonElement = withContext(Dispatchers.IO) {
         val base = Urls.moonrakerBase(printer) ?: throw MoonrakerException("Invalid address")
         val url = base.resolve(path) ?: throw MoonrakerException("Invalid address")
@@ -134,10 +162,22 @@ object MoonrakerClient {
         }
     }
 
-    private fun authHeaders(printer: Printer): Map<String, String> = buildMap {
-        printer.apiKey?.takeIf { it.isNotBlank() }?.let { put("X-Api-Key", it.trim()) }
-        tokens[printer.id]?.let { put("Authorization", "Bearer $it") }
+    /**
+     * Headers that authenticate against Moonraker (also accepted by nginx `auth_request`
+     * endpoints such as the paxx12 remote screen). Blocking: may log in first.
+     */
+    fun authHeaders(printer: Printer): Map<String, String> {
+        if (tokens[printer.id] == null && !printer.username.isNullOrBlank() && printer.apiKey.isNullOrBlank()) {
+            runCatching { login(printer) }
+        }
+        return buildMap {
+            printer.apiKey?.takeIf { it.isNotBlank() }?.let { put("X-Api-Key", it.trim()) }
+            tokens[printer.id]?.let { put("Authorization", "Bearer $it") }
+        }
     }
+
+    /** Forget a (probably expired) login token so the next request logs in again. */
+    fun invalidateToken(printer: Printer) { tokens.remove(printer.id) }
 
     private fun login(printer: Printer) {
         val base = Urls.moonrakerBase(printer) ?: return

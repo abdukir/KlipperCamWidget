@@ -26,6 +26,7 @@ and it works with any Klipper + Moonraker setup (Mainsail, Fluidd, crowsnest, ca
   | `ipstream`                 | Any video URL ExoPlayer can play                       |
   | `iframe`                   | paxx12 `/webcam/player` → raw H.264; otherwise snapshots |
   | *(not in Moonraker)*       | **RTSP** (`rtsp://<ip>:8554/stream`, paxx12)           |
+  | paxx12 `[webcam gui]` / `/screen/` | **Printer touchscreen**: mirrored and touch-controllable |
 
 - **Live widgets.** Tiles arrange themselves to fit the widget's size. Each tile shows a LIVE /
   SNAPSHOT / OFFLINE badge, and a ▶/⏸ button toggles live mode.
@@ -35,6 +36,8 @@ and it works with any Klipper + Moonraker setup (Mainsail, Fluidd, crowsnest, ca
   turns off, every connection is closed.
 - **Full-screen viewer.** Tap a tile to open it. You can swipe between cameras, pinch to zoom, and
   double-tap to reset the zoom.
+- **Printer touchscreen (paxx12 Remote Screen).** The U1's display can be shown in widgets like a
+  camera. In the full-screen viewer you can tap, long-press and drag on it to control the printer.
 - **Rotation and flips** come from the Moonraker webcam config, and you can change them per camera.
 
 ## Snapmaker U1 (paxx12 firmware)
@@ -49,13 +52,26 @@ uses the same paths under `/webcam2/`:
 | `/webcam/stream.h264`            | Raw Annex-B H.264                     |
 | `/webcam/snapshot.jpg`           | JPEG snapshot                         |
 | `rtsp://<ip>:8554/stream`        | RTSP (internal), `:8555` for USB; enable it in firmware-config → Camera |
+| `GET /screen/snapshot`           | Touchscreen framebuffer (PNG, ETag/304); enable in firmware-config → Web → Remote Screen |
+| `POST /screen/touch?a=down\|move\|up&x=&y=` | Touch input in framebuffer pixels |
 
 Setup:
 
 1. Install the app, tap **Add printer**, and enter the U1's IP address.
-2. Tap **Find cameras**. The app reads the cameras from Moonraker and checks for the RTSP ports.
+2. Tap **Find cameras**. The app reads the cameras from Moonraker and checks for the RTSP ports
+   and the remote screen.
    If Moonraker can't be reached, tap **U1 paxx12 preset** to add the default endpoints.
 3. Long-press your home screen → **Widgets** → **Klipper Cam**, then pick the cameras.
+
+### Controlling the printer's touchscreen
+
+Turn on **Remote Screen** in the paxx12 firmware-config (Web section). **Find cameras** then adds a
+**Touchscreen** entry. You can add it to a widget like any camera, but widget tiles can't receive
+touches, so tap the tile to open the full-screen viewer and control the screen from there. Swiping
+is forwarded to the printer as a drag, so use the ‹ › buttons to switch between cameras on that
+page. The app downloads a new image only when the screen changes, so a mirrored screen costs almost
+nothing while it's idle. If the printer requires a login (`force_logins`), set the API key or
+username/password on the printer.
 
 > The paxx12 WebRTC server accepts at most **4 simultaneous viewers per camera**. The app opens only
 > one connection per camera, shared by all widgets and the viewer, but browser tabs running
@@ -69,7 +85,8 @@ Android app widgets can't host video views: they can only show views that the la
 ```
              ┌──────────────── StreamHub (one connection per camera, shared) ────────────────┐
 WebRTC  ───► │ libwebrtc (HW H.264) ─► VideoSink ─► I420 scale ─► Bitmap                     │
-MJPEG   ───► │ multipart parser ─► JPEG decode (subsampled)                                  │──► Widgets (LiveWidgetService,
+MJPEG   ───► │ multipart parser ─► JPEG decode (subsampled)                                  │
+Screen  ───► │ PNG poll with ETag (304 = unchanged); touch → POST /screen/touch              │──► Widgets (LiveWidgetService,
 H.264   ───► │ Annex-B parser ─► MediaCodec ─► SurfaceTexture ─► GL readback                 │      partial RemoteViews updates)
 RTSP/HLS ──► │ ExoPlayer ─► SurfaceTexture ─► GL readback                                    │──► Full-screen viewer (Compose)
 Snapshot ──► │ HTTP poll ─► JPEG decode                                                      │
