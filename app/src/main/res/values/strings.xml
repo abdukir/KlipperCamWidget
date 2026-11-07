@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Klipper Cam</string>
+    <string name="widget_name">Klipper cameras</string>
+    <string name="widget_description">Live WebRTC, MJPEG, H.264, HLS and RTSP streams from your Klipper printers</string>
+    <string name="widget_empty">Tap to choose cameras</string>
+    <string name="live_channel">Live widgets</string>
+    <string name="live_notification_title">Camera widgets are live</string>
+    <string name="live_notification_text">Streaming paused automatically while the screen is off</string>
+    <string name="pause">Pause</string>
+</resources>

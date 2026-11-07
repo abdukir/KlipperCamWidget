@@ -1,0 +1,5 @@
+<resources>
+    <color name="widget_bg">#E6121212</color>
+    <color name="tile_bg">#FF000000</color>
+    <color name="badge_bg">#99000000</color>
+</resources>
