@@ -123,8 +123,10 @@ Requirements: JDK 17+ and the Android SDK (compileSdk 36).
 ./gradlew assembleRelease        # per-ABI + universal APKs
 ```
 
-GitHub Actions builds, tests and lints every push. Pushing a `v*` tag publishes the APKs as a
-GitHub release. To sign releases with your own key, add these repository secrets:
+GitHub Actions builds, tests and lints every push. To publish a release, push a `v*` tag, or open
+Actions → **Build** → **Run workflow** and enter the version (for example `v0.3.0`). The workflow
+creates the tag and a GitHub release with the APKs. Bump `versionCode`/`versionName` in
+`app/build.gradle.kts` first. To sign releases with your own key, add these repository secrets:
 `KEYSTORE_BASE64` (`base64 -w0 release.jks`), `KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD`.
 Without them, release APKs are signed with the CI runner's throwaway debug key, so they can't be
 installed as updates over each other.
