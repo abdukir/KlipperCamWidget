@@ -7,6 +7,18 @@ any mix of printers, and the widgets update live while their streams are connect
 It was built for the **Snapmaker U1 running the [paxx12 Extended Firmware](https://github.com/paxx12-snapmaker-u1/SnapmakerU1-Extended-Firmware)**,
 and it works with any Klipper + Moonraker setup (Mainsail, Fluidd, crowsnest, camera-streamer, go2rtc, MediaMTX…).
 
+## Download
+
+Get the latest APK from the [Releases page](https://github.com/abdukir/KlipperCamWidget/releases/latest):
+
+- **`app-arm64-v8a-release.apk`**: almost every phone from the last ~8 years. Pick this one if unsure.
+- `app-armeabi-v7a-release.apk`: older 32-bit phones.
+- `app-x86_64-release.apk`: emulators and Chromebooks.
+- `app-universal-release.apk`: works everywhere, but it's larger.
+
+Android asks you to allow installing apps from your browser or file manager the first time. Newer
+releases install as updates and keep your printers and widgets. Requires Android 8.0 or newer.
+
 ## Features
 
 - **Multiple printers.** Each printer is set up from its IP or hostname. Moonraker API keys and logins (`force_logins`) are supported.
