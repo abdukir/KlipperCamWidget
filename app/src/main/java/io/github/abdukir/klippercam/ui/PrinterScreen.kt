@@ -67,6 +67,9 @@ private fun paxx12Preset(printerId: String, host: String) = listOf(
         streamUrl = "/webcam/stream.h264", snapshotUrl = "/webcam/snapshot.jpg", moonrakerUid = "paxx12-case-h264"),
     CameraStream(printerId = printerId, name = "Internal camera (RTSP)", type = StreamType.RTSP,
         streamUrl = "rtsp://$host:8554/stream", snapshotUrl = "/webcam/snapshot.jpg", moonrakerUid = "rtsp-8554"),
+    CameraStream(printerId = printerId, name = "Touchscreen", type = StreamType.SCREEN,
+        streamUrl = "/screen/", snapshotUrl = "/screen/snapshot", aspectRatio = "480:320",
+        moonrakerUid = "paxx12-screen", snapshotFallback = false),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -115,9 +118,11 @@ fun PrinterScreen(printerId: String?, onDone: () -> Unit) {
                 val r = MoonrakerClient.discover(p)
                 if (name.isBlank()) name = r.info.hostname ?: p.address
                 addCandidates(r.cameras, true)
-                addCandidates(r.extras, false)
+                addCandidates(r.extras.filter { it.type == StreamType.SCREEN }, true)
+                addCandidates(r.extras.filter { it.type != StreamType.SCREEN }, false)
                 message = "Connected (Klipper: ${r.info.klippyState ?: "?"}). Found ${r.cameras.size} camera(s)" +
-                    if (r.extras.isNotEmpty()) " plus ${r.extras.size} RTSP stream(s)." else "."
+                    (if (r.extras.any { it.type == StreamType.RTSP }) " plus ${r.extras.count { it.type == StreamType.RTSP }} RTSP stream(s)" else "") +
+                    (if (r.extras.any { it.type == StreamType.SCREEN }) " and the printer's touchscreen." else ".")
             } catch (e: Exception) {
                 message = "Could not reach Moonraker: ${e.message}. You can still add cameras manually or use the Snapmaker U1 preset."
             } finally {
@@ -197,7 +202,8 @@ fun PrinterScreen(printerId: String?, onDone: () -> Unit) {
             }
             Spacer(Modifier.padding(4.dp))
             Text(
-                "Tip: on the paxx12 firmware, RTSP must be enabled in firmware-config (Camera → RTSP). " +
+                "Tip: on the paxx12 firmware, RTSP (firmware-config → Camera) and the touchscreen " +
+                    "mirror (firmware-config → Web → Remote Screen) must be enabled first. " +
                     "WebRTC is the default and works best on your local network.",
                 style = MaterialTheme.typography.bodySmall,
             )

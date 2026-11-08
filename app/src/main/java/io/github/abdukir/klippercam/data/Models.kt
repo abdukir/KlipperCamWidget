@@ -37,7 +37,9 @@ enum class StreamType(val label: String, val moonrakerService: String?) {
     VIDEO("Video URL (ipstream)", "ipstream"),
     RTSP("RTSP", null),
     IFRAME("Web page (iframe)", "iframe"),
-    SNAPSHOT("Snapshot polling", null);
+    SNAPSHOT("Snapshot polling", null),
+    /** paxx12 "Remote Screen": the printer's touchscreen, viewable and controllable. */
+    SCREEN("Printer touchscreen (paxx12)", null);
 
     val isWebRtc: Boolean
         get() = this == WEBRTC_CAMERA_STREAMER || this == WEBRTC_GO2RTC ||

@@ -30,6 +30,8 @@ abstract class FrameSource(protected val ctx: SourceContext) {
     @Volatile var fps: Int = 2
 
     internal var sink: ((Bitmap) -> Unit)? = null
+    /** Tells the hub the connection is healthy even though no new frame was produced. */
+    internal var heartbeat: (() -> Unit)? = null
     private var lastEmit = 0L
 
     abstract suspend fun run()
@@ -38,6 +40,10 @@ abstract class FrameSource(protected val ctx: SourceContext) {
     protected fun wantFrame(): Boolean {
         val interval = 1000L / fps.coerceIn(1, 60)
         return SystemClock.elapsedRealtime() - lastEmit >= interval - 5
+    }
+
+    protected fun alive() {
+        heartbeat?.invoke()
     }
 
     protected fun emit(bitmap: Bitmap) {

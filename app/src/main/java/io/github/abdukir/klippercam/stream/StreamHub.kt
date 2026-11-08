@@ -116,6 +116,9 @@ class StreamHub(private val context: Context, private val repo: Repository) {
         entries.keys.toList().forEach { id -> if (entries[id]?.subscribers?.containsKey(owner) == true) unsubscribe(id, owner) }
     }
 
+    /** Asks a remote-screen source to refresh right away (e.g. after a touch). */
+    fun poke(streamId: String) = synchronized(entries) { (entries[streamId]?.source as? ScreenSource)?.poke() }
+
     fun activeStreamIds(): Set<String> = synchronized(entries) { entries.keys.toSet() }
 
     private fun applyRequest(src: FrameSource, r: FrameRequest) {
@@ -193,6 +196,10 @@ class StreamHub(private val context: Context, private val repo: Repository) {
         // Keep showing OFFLINE / SNAPSHOT during retries instead of flickering to "Connecting".
         if (primary && (status.value == StreamStatus.Idle || status.value == StreamStatus.Live)) status.value = StreamStatus.Connecting
         var lastFrame = SystemClock.elapsedRealtime()
+        src.heartbeat = {
+            lastFrame = SystemClock.elapsedRealtime()
+            if (primary && status.value != StreamStatus.Live) { status.value = StreamStatus.Live; onLive() }
+        }
         src.sink = { bmp ->
             lastFrame = SystemClock.elapsedRealtime()
             frames.value = Frame(bmp)
@@ -225,16 +232,21 @@ class StreamHub(private val context: Context, private val repo: Repository) {
             t.message ?: t.javaClass.simpleName
         } finally {
             src.sink = null
+            src.heartbeat = null
         }
     }
 
     private fun isSnapshotOnly(sc: SourceContext): Boolean = sc.streamUrl == null ||
-        sc.stream.type == StreamType.MJPEG_ADAPTIVE || sc.stream.type == StreamType.SNAPSHOT || sc.stream.type == StreamType.IFRAME
+        sc.stream.type == StreamType.MJPEG_ADAPTIVE || sc.stream.type == StreamType.SNAPSHOT || sc.stream.type == StreamType.IFRAME ||
+        sc.stream.type == StreamType.SCREEN
 
     private fun createPrimary(sc: SourceContext): FrameSource {
         val url = sc.streamUrl
         val snapshot = sc.snapshotUrl
         val type = sc.stream.type
+        if (type == StreamType.SCREEN) {
+            return ScreenSource(sc, RemoteScreen.snapshotUrl(url, snapshot) ?: throw IllegalStateException("Screen needs a snapshot URL"))
+        }
         if (url == null) {
             return SnapshotSource(sc, snapshot ?: throw IllegalStateException("Camera has no URL"))
         }
@@ -247,6 +259,7 @@ class StreamHub(private val context: Context, private val repo: Repository) {
             StreamType.MJPEG_ADAPTIVE, StreamType.SNAPSHOT -> SnapshotSource(sc, snapshot ?: url)
             StreamType.H264_STREAM -> H264Source(sc, url)
             StreamType.HLS, StreamType.VIDEO, StreamType.RTSP -> ExoSource(sc, url)
+            StreamType.SCREEN -> error("handled above")
             StreamType.IFRAME -> SnapshotSource(sc, snapshot ?: throw IllegalStateException("iframe camera needs a snapshot URL"))
         }
     }

@@ -52,6 +52,7 @@ private fun urlHint(type: StreamType) = when (type) {
     StreamType.VIDEO -> "http://host/video.mp4"
     StreamType.RTSP -> "rtsp://host:8554/stream"
     StreamType.IFRAME -> "(shown via snapshot URL)"
+    StreamType.SCREEN -> "/screen/  (snapshot: /screen/snapshot)"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
